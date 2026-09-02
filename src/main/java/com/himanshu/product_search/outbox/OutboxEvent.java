@@ -27,6 +27,10 @@ public class OutboxEvent {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private OutboxEventStatus status;
+
     public Long getId() {
         return id;
     }
@@ -69,5 +73,13 @@ public class OutboxEvent {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public OutboxEventStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(OutboxEventStatus status) {
+        this.status = status;
     }
 }

@@ -5,6 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.himanshu.product_search.common.exception.ProductNotFoundException;
 import com.himanshu.product_search.outbox.OutboxEvent;
 import com.himanshu.product_search.outbox.OutboxEventRepository;
+import com.himanshu.product_search.outbox.OutboxEventStatus;
 import com.himanshu.product_search.outbox.ProductEvent;
 import com.himanshu.product_search.product.dto.CreateProductRequest;
 import com.himanshu.product_search.product.dto.ProductResponse;
@@ -160,6 +161,7 @@ public class ProductService {
             outboxEvent.setEventType(eventType);
             outboxEvent.setPayload(objectMapper.writeValueAsString(event));
             outboxEvent.setCreatedAt(LocalDateTime.now());
+            outboxEvent.setStatus(OutboxEventStatus.PENDING);
 
             outboxEventRepository.save(outboxEvent);
 
