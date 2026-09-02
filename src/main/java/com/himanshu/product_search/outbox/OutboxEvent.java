@@ -1,6 +1,7 @@
 package com.himanshu.product_search.outbox;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDateTime;
 
@@ -29,6 +30,7 @@ public class OutboxEvent {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @ColumnDefault("'PENDING'")
     private OutboxEventStatus status;
 
     public Long getId() {
