@@ -35,7 +35,7 @@ public class SearchService {
         this.elasticsearchClient = elasticsearchClient;
     }
 
-    public Page<ProductSearchDocument> search(
+    public Page<ProductSearchResponse> search(
             SearchRequest request,
             Pageable pageable) {
 
@@ -189,10 +189,20 @@ public class SearchService {
                         ProductSearchDocument.class
                 );
 
-        List<ProductSearchDocument> products =
+        List<ProductSearchResponse> products =
                 searchHits.getSearchHits()
                         .stream()
                         .map(SearchHit::getContent)
+                        .map(document -> new ProductSearchResponse(
+                                document.getId(),
+                                document.getName(),
+                                document.getDescription(),
+                                document.getBrand(),
+                                document.getCategory(),
+                                document.getPrice(),
+                                document.getRating(),
+                                document.getInStock()
+                        ))
                         .toList();
 
         return new PageImpl<>(

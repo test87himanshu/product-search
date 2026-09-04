@@ -1,6 +1,5 @@
 package com.himanshu.product_search.search;
 
-import com.himanshu.product_search.product.search.ProductSearchDocument;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
@@ -16,7 +15,7 @@ public class SearchController {
     }
 
     @GetMapping
-    public Page<ProductSearchDocument> search(
+    public Page<ProductSearchResponse> search(
             @ModelAttribute SearchRequest request,
             Pageable pageable) {
 
