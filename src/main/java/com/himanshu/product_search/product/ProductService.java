@@ -128,8 +128,6 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(id));
 
-        productRepository.delete(product);
-
         ProductEvent event = new ProductEvent(
                 product.getId(),
                 product.getName(),
@@ -141,8 +139,10 @@ public class ProductService {
                 product.getInStock()
         );
 
+        productRepository.delete(product);
+
         saveOutboxEvent(
-                product.getId(),
+                id,
                 "PRODUCT_DELETED",
                 event
         );
