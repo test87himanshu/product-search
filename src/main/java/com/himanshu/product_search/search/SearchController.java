@@ -22,4 +22,11 @@ public class SearchController {
 
         return searchService.search(request, pageable);
     }
+
+    @GetMapping("/suggest")
+    public Object suggest(
+            @RequestParam String q
+    ) {
+        return searchService.suggest(q);
+    }
 }
