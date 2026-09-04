@@ -1,8 +1,8 @@
 package com.himanshu.product_search.kafka;
 
 import tools.jackson.databind.ObjectMapper;
-import com.himanshu.product_search.product.search.ProductSearchDocument;
-import com.himanshu.product_search.product.search.ProductSearchService;
+import com.himanshu.product_search.outbox.ProductEvent;
+import com.himanshu.product_search.product.search.ProductIndexService;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -10,14 +10,14 @@ import org.springframework.stereotype.Component;
 public class ProductEventConsumer {
 
     private final ObjectMapper objectMapper;
-    private final ProductSearchService productSearchService;
+    private final ProductIndexService productIndexService;
 
     public ProductEventConsumer(
             ObjectMapper objectMapper,
-            ProductSearchService productSearchService
+            ProductIndexService productIndexService
     ) {
         this.objectMapper = objectMapper;
-        this.productSearchService = productSearchService;
+        this.productIndexService = productIndexService;
     }
 
     @KafkaListener(
@@ -27,39 +27,19 @@ public class ProductEventConsumer {
     public void consume(String message) {
 
         try {
-            ProductKafkaEvent event =
+            ProductKafkaEvent kafkaEvent =
                     objectMapper.readValue(
                             message,
                             ProductKafkaEvent.class
                     );
 
-            switch (event.getEventType()) {
-
-                case "PRODUCT_CREATED":
-                case "PRODUCT_UPDATED":
-
-                    ProductSearchDocument product =
-                            objectMapper.readValue(
-                                    event.getPayload(),
-                                    ProductSearchDocument.class
-                            );
-
-                    productSearchService.index(product);
-                    break;
-
-                case "PRODUCT_DELETED":
-
-                    productSearchService.delete(
-                            Long.valueOf(event.getAggregateId())
+            ProductEvent productEvent =
+                    objectMapper.readValue(
+                            kafkaEvent.getPayload(),
+                            ProductEvent.class
                     );
-                    break;
 
-                default:
-                    throw new IllegalArgumentException(
-                            "Unknown product event type: "
-                                    + event.getEventType()
-                    );
-            }
+            productIndexService.index(productEvent);
 
         } catch (Exception e) {
             throw new RuntimeException(
