@@ -10,7 +10,9 @@ import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch._types.SortOptions;
@@ -74,6 +76,11 @@ public class SearchService {
                                         .order(SortOrder.Desc)
                                 )
                         )
+                );
+
+                default -> throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Unsupported sort option: " + request.getSort()
                 );
             }
         }
