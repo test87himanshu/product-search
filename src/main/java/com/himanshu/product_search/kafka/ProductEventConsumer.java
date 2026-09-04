@@ -33,13 +33,30 @@ public class ProductEventConsumer {
                             ProductKafkaEvent.class
                     );
 
-            ProductEvent productEvent =
-                    objectMapper.readValue(
-                            kafkaEvent.getPayload(),
-                            ProductEvent.class
-                    );
+            switch (kafkaEvent.getEventType()) {
 
-            productIndexService.index(productEvent);
+                case "PRODUCT_CREATED":
+                case "PRODUCT_UPDATED":
+                    ProductEvent productEvent =
+                            objectMapper.readValue(
+                                    kafkaEvent.getPayload(),
+                                    ProductEvent.class
+                            );
+                    productIndexService.index(productEvent);
+                    break;
+
+                case "PRODUCT_DELETED":
+                    productIndexService.delete(
+                            Long.valueOf(kafkaEvent.getAggregateId())
+                    );
+                    break;
+
+                default:
+                    throw new IllegalArgumentException(
+                            "Unknown product event type: "
+                                    + kafkaEvent.getEventType()
+                    );
+            }
 
         } catch (Exception e) {
             throw new RuntimeException(
