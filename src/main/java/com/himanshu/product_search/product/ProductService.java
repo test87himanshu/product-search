@@ -1,31 +1,43 @@
 package com.himanshu.product_search.product;
 
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.himanshu.product_search.common.exception.ProductNotFoundException;
+import com.himanshu.product_search.outbox.OutboxEvent;
+import com.himanshu.product_search.outbox.OutboxEventRepository;
+import com.himanshu.product_search.outbox.OutboxEventStatus;
+import com.himanshu.product_search.outbox.ProductEvent;
 import com.himanshu.product_search.product.dto.CreateProductRequest;
 import com.himanshu.product_search.product.dto.ProductResponse;
 import com.himanshu.product_search.product.mapper.ProductMapper;
-import com.himanshu.product_search.product.search.ProductIndexService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 @Service
 public class ProductService {
 
     private final ProductRepository productRepository;
-    private final ProductIndexService productIndexService;
     private final ProductMapper productMapper;
+    private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper objectMapper;
 
     public ProductService(
             ProductRepository productRepository,
-            ProductIndexService productIndexService,
-            ProductMapper productMapper) {
+            ProductMapper productMapper,
+            OutboxEventRepository outboxEventRepository,
+            ObjectMapper objectMapper) {
 
         this.productRepository = productRepository;
-        this.productIndexService = productIndexService;
         this.productMapper = productMapper;
+        this.outboxEventRepository = outboxEventRepository;
+        this.objectMapper = objectMapper;
     }
 
+    @Transactional
     public ProductResponse createProduct(CreateProductRequest request) {
 
         Product product = new Product();
@@ -39,7 +51,23 @@ public class ProductService {
         product.setInStock(request.getInStock());
 
         Product savedProduct = productRepository.save(product);
-        productIndexService.index(savedProduct);
+
+        ProductEvent event = new ProductEvent(
+                savedProduct.getId(),
+                savedProduct.getName(),
+                savedProduct.getDescription(),
+                savedProduct.getBrand(),
+                savedProduct.getCategory(),
+                savedProduct.getPrice(),
+                savedProduct.getRating(),
+                savedProduct.getInStock()
+        );
+
+        saveOutboxEvent(
+                savedProduct.getId(),
+                "PRODUCT_CREATED",
+                event
+        );
 
         return productMapper.toResponse(savedProduct);
     }
@@ -58,6 +86,7 @@ public class ProductService {
                 .map(productMapper::toResponse);
     }
 
+    @Transactional
     public ProductResponse updateProduct(Long id, CreateProductRequest request) {
 
         Product product = productRepository.findById(id)
@@ -72,15 +101,72 @@ public class ProductService {
         product.setInStock(request.getInStock());
 
         Product savedProduct = productRepository.save(product);
-        productIndexService.index(savedProduct);
+
+        ProductEvent event = new ProductEvent(
+                savedProduct.getId(),
+                savedProduct.getName(),
+                savedProduct.getDescription(),
+                savedProduct.getBrand(),
+                savedProduct.getCategory(),
+                savedProduct.getPrice(),
+                savedProduct.getRating(),
+                savedProduct.getInStock()
+        );
+
+        saveOutboxEvent(
+                savedProduct.getId(),
+                "PRODUCT_UPDATED",
+                event
+        );
 
         return productMapper.toResponse(savedProduct);
     }
 
+    @Transactional
     public void deleteProduct(Long id) {
 
-        productRepository.deleteById(id);
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ProductNotFoundException(id));
 
-        productIndexService.delete(id);
+        productRepository.delete(product);
+
+        ProductEvent event = new ProductEvent(
+                product.getId(),
+                product.getName(),
+                product.getDescription(),
+                product.getBrand(),
+                product.getCategory(),
+                product.getPrice(),
+                product.getRating(),
+                product.getInStock()
+        );
+
+        saveOutboxEvent(
+                product.getId(),
+                "PRODUCT_DELETED",
+                event
+        );
+    }
+
+    private void saveOutboxEvent(
+            Long productId,
+            String eventType,
+            ProductEvent event) {
+
+        try {
+            OutboxEvent outboxEvent = new OutboxEvent();
+
+            outboxEvent.setAggregateType("PRODUCT");
+            outboxEvent.setAggregateId(productId.toString());
+            outboxEvent.setEventType(eventType);
+            outboxEvent.setPayload(objectMapper.writeValueAsString(event));
+            outboxEvent.setCreatedAt(LocalDateTime.now());
+            outboxEvent.setStatus(OutboxEventStatus.PENDING);
+
+            outboxEventRepository.save(outboxEvent);
+
+        } catch (JacksonException e) {
+            throw new RuntimeException("Failed to create outbox event", e);
+        }
     }
 }
