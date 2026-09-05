@@ -10,7 +10,11 @@ import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch._types.SortOptions;
 import co.elastic.clients.elasticsearch._types.SortOrder;
 
@@ -21,12 +25,17 @@ import java.util.List;
 public class SearchService {
 
     private final ElasticsearchOperations elasticsearchOperations;
+    private final ElasticsearchClient elasticsearchClient;
 
-    public SearchService(ElasticsearchOperations elasticsearchOperations) {
+    public SearchService(
+            ElasticsearchOperations elasticsearchOperations,
+            ElasticsearchClient elasticsearchClient
+    ) {
         this.elasticsearchOperations = elasticsearchOperations;
+        this.elasticsearchClient = elasticsearchClient;
     }
 
-    public Page<ProductSearchDocument> search(
+    public Page<ProductSearchResponse> search(
             SearchRequest request,
             Pageable pageable) {
 
@@ -67,6 +76,11 @@ public class SearchService {
                                         .order(SortOrder.Desc)
                                 )
                         )
+                );
+
+                default -> throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Unsupported sort option: " + request.getSort()
                 );
             }
         }
@@ -175,10 +189,20 @@ public class SearchService {
                         ProductSearchDocument.class
                 );
 
-        List<ProductSearchDocument> products =
+        List<ProductSearchResponse> products =
                 searchHits.getSearchHits()
                         .stream()
                         .map(SearchHit::getContent)
+                        .map(document -> new ProductSearchResponse(
+                                document.getId(),
+                                document.getName(),
+                                document.getDescription(),
+                                document.getBrand(),
+                                document.getCategory(),
+                                document.getPrice(),
+                                document.getRating(),
+                                document.getInStock()
+                        ))
                         .toList();
 
         return new PageImpl<>(
@@ -186,5 +210,39 @@ public class SearchService {
                 pageable,
                 searchHits.getTotalHits()
         );
+    }
+
+    public List<String> suggest(String query) {
+
+        try {
+            SearchResponse<Void> response =
+                    elasticsearchClient.search(s -> s
+                                    .index("products")
+                                    .suggest(sg -> sg
+                                            .suggesters("product-suggestions", cs -> cs
+                                                    .prefix(query)
+                                                    .completion(c -> c
+                                                            .field("suggest")
+                                                    )
+                                            )
+                                    ),
+                            Void.class
+                    );
+
+            return response.suggest()
+                    .get("product-suggestions")
+                    .stream()
+                    .flatMap(suggestion ->
+                            suggestion.completion().options().stream()
+                    )
+                    .map(option -> option.text())
+                    .toList();
+
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Failed to fetch product suggestions",
+                    e
+            );
+        }
     }
 }

@@ -48,4 +48,16 @@ public class GlobalExceptionHandler {
                 "timestamp", Instant.now().toString()
         );
     }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, Object> handleIllegalArgumentException(
+            IllegalArgumentException exception) {
+
+        return Map.of(
+                "status", 400,
+                "message", exception.getMessage(),
+                "timestamp", Instant.now().toString()
+        );
+    }
 }
